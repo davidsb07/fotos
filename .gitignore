@@ -1,0 +1,58 @@
+# ---------------------------
+# OS / editor files
+# ---------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ---------------------------
+# Python
+# ---------------------------
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.pyd
+*.pyo
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+pip-wheel-metadata/
+
+# ---------------------------
+# Node / frontend
+# ---------------------------
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/.cache/
+frontend/.eslintcache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ---------------------------
+# Environment / secrets
+# ---------------------------
+.env
+.env.*
+!.env.example
+
+# ---------------------------
+# Misc
+# ---------------------------
+*.log
