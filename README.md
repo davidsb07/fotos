@@ -2,8 +2,8 @@
 title: Gerador de Registro Fotografico
 sdk: docker
 app_port: 7860
-colorFrom: teal
-colorTo: orange
+colorFrom: blue
+colorTo: green
 ---
 
 # Gerador de Registro Fotografico (FastAPI + React)
