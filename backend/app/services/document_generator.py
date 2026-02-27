@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import tempfile
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
+from zipfile import ZIP_STORED
 
 from docx import Document
+from docx.opc import phys_pkg
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.shared import Cm, Pt
@@ -15,6 +19,7 @@ from PIL import Image, ImageOps
 EXIF_ORIENTATION_TAG = 274
 ORIENTACOES_ROTACIONADAS = {5, 6, 7, 8}
 ORIENTACOES_TRANSPOSTAS = {2, 3, 4, 5, 6, 7, 8}
+ZIP_SAVE_LOCK = Lock()
 
 
 @dataclass(slots=True)
@@ -81,6 +86,22 @@ def _calcular_dimensoes_foto(caminho: Path, largura_max: float, altura_max: floa
             altura = largura / proporcao
 
     return largura, altura
+
+
+@contextmanager
+def _zip_docx_sem_compressao():
+    """Troca temporariamente o modo de escrita do docx para ZIP_STORED.
+
+    Isso evita o custo alto de compressao zlib na etapa de save, reduzindo
+    bastante o tempo total de geracao.
+    """
+    with ZIP_SAVE_LOCK:
+        valor_original = phys_pkg.ZIP_DEFLATED
+        phys_pkg.ZIP_DEFLATED = ZIP_STORED
+        try:
+            yield
+        finally:
+            phys_pkg.ZIP_DEFLATED = valor_original
 
 
 def criar_documento_fotos(
@@ -175,7 +196,8 @@ def criar_documento_fotos(
                 run_desc_2.font.size = Pt(9)
                 run_desc_2.font.name = "Arial"
 
-        documento.save(str(arquivo_saida))
+        with _zip_docx_sem_compressao():
+            documento.save(str(arquivo_saida))
     finally:
         for arquivo_tmp in temporarios:
             try:
