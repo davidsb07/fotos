@@ -19,6 +19,7 @@ import { CSS } from "@dnd-kit/utilities";
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 const TITULO_PADRAO = "ANEXO VI - REGISTRO FOTOGRAFICO";
 const ETAPAS = ["Informacoes", "Fotos, Ordem e Descricoes"];
+const TEMPO_MINIMO_LOADER_MS = 900;
 
 function criarOrigemPadrao() {
   const meses = [
@@ -84,6 +85,12 @@ function formatarTempoGeracao(totalSegundos) {
   const minutos = Math.floor(totalSegundos / 60);
   const segundos = totalSegundos % 60;
   return `${String(minutos).padStart(2, "0")}:${String(segundos).padStart(2, "0")}`;
+}
+
+function aguardarProximoFrame() {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
 }
 
 function SortableReorderTile({ foto, indice, onRemover, onAbrirPreview }) {
@@ -517,6 +524,9 @@ export default function App() {
     setError("");
     limparDownload();
 
+    // Garante que o modal de loading seja renderizado antes de iniciar o envio.
+    await aguardarProximoFrame();
+
     const formData = new FormData();
     formData.append("title", title.trim() || defaults.title);
     formData.append("source", source.trim() || defaults.source);
@@ -564,6 +574,11 @@ export default function App() {
       const mensagem = err instanceof Error ? err.message : "Falha inesperada ao gerar documento.";
       setError(mensagem);
     } finally {
+      const inicio = generationStartedAtRef.current ?? Date.now();
+      const decorridoMs = Date.now() - inicio;
+      if (decorridoMs < TEMPO_MINIMO_LOADER_MS) {
+        await new Promise((resolve) => window.setTimeout(resolve, TEMPO_MINIMO_LOADER_MS - decorridoMs));
+      }
       setIsGenerating(false);
     }
   }
