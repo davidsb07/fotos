@@ -80,6 +80,12 @@ function baixarArquivo(url, nomeArquivo) {
   anchor.remove();
 }
 
+function formatarTempoGeracao(totalSegundos) {
+  const minutos = Math.floor(totalSegundos / 60);
+  const segundos = totalSegundos % 60;
+  return `${String(minutos).padStart(2, "0")}:${String(segundos).padStart(2, "0")}`;
+}
+
 function SortableReorderTile({ foto, indice, onRemover, onAbrirPreview }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: foto.id
@@ -124,15 +130,12 @@ function DescriptionPhotoCard({ foto, indice, onRemover, onAtualizarDescricao, o
           </button>
         </div>
         <p>{foto.file.name}</p>
-        <details className="description-details">
-          <summary>{foto.description.trim() ? "Editar descricao" : "Adicionar descricao"}</summary>
-          <textarea
-            value={foto.description}
-            onChange={(e) => onAtualizarDescricao(foto.id, e.target.value)}
-            rows={4}
-            placeholder="Descreva a foto..."
-          />
-        </details>
+        <textarea
+          value={foto.description}
+          onChange={(e) => onAtualizarDescricao(foto.id, e.target.value)}
+          rows={4}
+          placeholder="Descreva a foto..."
+        />
       </div>
     </article>
   );
@@ -154,11 +157,13 @@ export default function App() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [downloadInfo, setDownloadInfo] = useState(null);
   const [isDropzoneActive, setIsDropzoneActive] = useState(false);
 
   const photosRef = useRef([]);
   const downloadInfoRef = useRef(null);
+  const generationStartedAtRef = useRef(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -235,6 +240,26 @@ export default function App() {
       setPhotoToRemoveId(null);
     }
   }, [photoToRemoveId, photos]);
+
+  useEffect(() => {
+    if (!isGenerating) {
+      setGenerationElapsedSeconds(0);
+      generationStartedAtRef.current = null;
+      return;
+    }
+
+    if (!generationStartedAtRef.current) {
+      generationStartedAtRef.current = Date.now();
+    }
+
+    const intervalId = window.setInterval(() => {
+      const inicio = generationStartedAtRef.current || Date.now();
+      const decorrido = Math.max(0, Math.floor((Date.now() - inicio) / 1000));
+      setGenerationElapsedSeconds(decorrido);
+    }, 250);
+
+    return () => window.clearInterval(intervalId);
+  }, [isGenerating]);
 
   const previewPhoto = useMemo(
     () => (previewIndex === null ? null : photos[previewIndex] || null),
@@ -485,6 +510,8 @@ export default function App() {
       return;
     }
 
+    generationStartedAtRef.current = Date.now();
+    setGenerationElapsedSeconds(0);
     setIsGenerating(true);
     setStatus("");
     setError("");
@@ -621,7 +648,7 @@ export default function App() {
                     <p className="muted panel-hint">
                       {isReorderMode
                         ? "Modo reordenar ativo: miniaturas menores em grade arrastavel."
-                        : "Modo descricao: fotos em pares com campo retratil de descricao."}
+                        : "Modo descricao: fotos em pares com campo de descricao sempre visivel."}
                     </p>
                   </div>
 
@@ -780,6 +807,16 @@ export default function App() {
                   Recomecar
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {isGenerating && (
+          <div className="loading-modal-backdrop" role="status" aria-live="polite" aria-modal="true">
+            <div className="loading-modal">
+              <div className="loading-spinner" aria-hidden="true" />
+              <h3>Gerando documento Word...</h3>
+              <p>Tempo decorrido: {formatarTempoGeracao(generationElapsedSeconds)}</p>
             </div>
           </div>
         )}
