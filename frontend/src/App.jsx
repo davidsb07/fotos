@@ -189,6 +189,7 @@ export default function App() {
   const [generationElapsedSeconds, setGenerationElapsedSeconds] = useState(0);
   const [downloadInfo, setDownloadInfo] = useState(null);
   const [isDropzoneActive, setIsDropzoneActive] = useState(false);
+  const [dotsPinned, setDotsPinned] = useState(false);
 
   const photosRef = useRef([]);
   const downloadInfoRef = useRef(null);
@@ -293,6 +294,35 @@ export default function App() {
     return () => window.clearInterval(intervalId);
   }, [isGenerating]);
 
+  useEffect(() => {
+    function updateActiveStepFromScroll() {
+      const panels = Array.from(document.querySelectorAll("[data-step-panel]"));
+      let activeStep = step;
+
+      for (const panel of panels) {
+        const rect = panel.getBoundingClientRect();
+        if (rect.top <= 130 && rect.bottom > 130) {
+          const nextStep = Number(panel.getAttribute("data-step-panel"));
+          if (Number.isFinite(nextStep)) {
+            activeStep = nextStep;
+          }
+          break;
+        }
+      }
+
+      setStep((current) => (current === activeStep ? current : activeStep));
+      setDotsPinned(window.scrollY > 120);
+    }
+
+    updateActiveStepFromScroll();
+    window.addEventListener("scroll", updateActiveStepFromScroll, { passive: true });
+    window.addEventListener("resize", updateActiveStepFromScroll);
+    return () => {
+      window.removeEventListener("scroll", updateActiveStepFromScroll);
+      window.removeEventListener("resize", updateActiveStepFromScroll);
+    };
+  }, [step]);
+
   const resumoUpload = useMemo(() => {
     if (!photos.length) return "Nenhuma foto adicionada.";
     return `${photos.length} foto(s) pronta(s) para o documento.`;
@@ -365,6 +395,13 @@ export default function App() {
       setError("");
     }
     setStep(nextStep);
+    const panel = document.querySelector(`[data-step-panel="${nextStep}"]`);
+    panel?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function irParaTopo() {
+    setStep(1);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function limparDownload() {
@@ -575,12 +612,22 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <aside className="side-dots" aria-label="Etapas">
+      <aside className={`side-dots ${dotsPinned ? "is-pinned" : ""}`} aria-label="Etapas">
+        <button
+          type="button"
+          className="side-dot side-dot-top"
+          data-step-label="Início"
+          aria-label="Início"
+          onClick={irParaTopo}
+        >
+          Início
+        </button>
         {ETAPAS.map((etapa) => (
           <button
             key={etapa.id}
             type="button"
             className={`side-dot ${step === etapa.id ? "active" : ""}`}
+            data-step-target={`step-${etapa.id}`}
             data-step-label={etapa.short}
             aria-label={`Etapa ${etapa.id} - ${etapa.title}`}
             onClick={() => irParaEtapa(etapa.id)}
@@ -628,7 +675,11 @@ export default function App() {
           </div>
         </section>
 
-        <section className={`panel ${step === 1 ? "is-active-step" : ""}`}>
+        <section
+          id="step-1"
+          data-step-panel="1"
+          className={`panel ${step === 1 ? "is-active-step" : ""}`}
+        >
           <div className="section-head">
             <div>
               <p className="eyebrow small">Etapa 1</p>
@@ -648,7 +699,11 @@ export default function App() {
           </div>
         </section>
 
-        <section className={`panel ${step === 2 ? "is-active-step" : ""}`}>
+        <section
+          id="step-2"
+          data-step-panel="2"
+          className={`panel ${step === 2 ? "is-active-step" : ""}`}
+        >
           <div className="section-head">
             <div>
               <p className="eyebrow small">Etapa 2</p>
