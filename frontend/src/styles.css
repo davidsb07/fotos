@@ -184,17 +184,6 @@ code {
   font-size: 0.82rem;
 }
 
-.side-dot::before {
-  content: "";
-  position: absolute;
-  inset: 5px 8px auto 8px;
-  height: 11px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.58);
-  filter: blur(0.2px);
-  pointer-events: none;
-}
-
 .side-dot.active {
   border-color: #b98720;
   background: linear-gradient(180deg, #f7d581 0%, #c6922b 100%);
