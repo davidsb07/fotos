@@ -5,27 +5,30 @@ import {
   KeyboardSensor,
   PointerSensor,
   useSensor,
-  useSensors
+  useSensors,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   arrayMove,
   rectSortingStrategy,
   sortableKeyboardCoordinates,
-  useSortable
+  useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-const TITULO_PADRAO = "ANEXO VI - REGISTRO FOTOGRAFICO";
-const ETAPAS = ["Informacoes", "Fotos, Ordem e Descricoes"];
+const TITULO_PADRAO = "ANEXO VI - REGISTRO FOTOGRÁFICO";
+const ETAPAS = [
+  { id: 1, short: "Dados", title: "Informações do documento" },
+  { id: 2, short: "Fotos", title: "Fotos, ordem e descrições" },
+];
 const TEMPO_MINIMO_LOADER_MS = 900;
 
 function criarOrigemPadrao() {
   const meses = [
     "janeiro",
     "fevereiro",
-    "marco",
+    "março",
     "abril",
     "maio",
     "junho",
@@ -34,7 +37,7 @@ function criarOrigemPadrao() {
     "setembro",
     "outubro",
     "novembro",
-    "dezembro"
+    "dezembro",
   ];
   const hoje = new Date();
   const dia = String(hoje.getDate()).padStart(2, "0");
@@ -55,9 +58,7 @@ function assinaturaArquivo(file) {
 }
 
 function extrairNomeArquivo(contentDisposition) {
-  if (!contentDisposition) {
-    return null;
-  }
+  if (!contentDisposition) return null;
 
   const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
   if (utf8Match?.[1]) {
@@ -93,27 +94,45 @@ function aguardarProximoFrame() {
   });
 }
 
-function SortableReorderTile({ foto, indice, onRemover, onAbrirPreview }) {
+function criarDescricaoFallback(indice) {
+  return `Foto ${indice + 1}`;
+}
+
+function SortablePhotoTile({ foto, indice, onAbrirPreview, onRemover }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
-    id: foto.id
+    id: foto.id,
   });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition
+    transition,
   };
 
   return (
-    <article ref={setNodeRef} style={style} className={`reorder-tile ${isDragging ? "dragging" : ""}`}>
-      <button type="button" className="reorder-handle" aria-label="Arrastar foto" {...attributes} {...listeners}>
+    <article
+      ref={setNodeRef}
+      style={style}
+      className={`reorder-tile ${isDragging ? "dragging" : ""}`}
+    >
+      <button
+        type="button"
+        className="drag-handle"
+        aria-label={`Arrastar ${foto.file.name}`}
+        {...attributes}
+        {...listeners}
+      >
         Arrastar
       </button>
-      <button type="button" className="reorder-preview-btn" onClick={() => onAbrirPreview(foto.id)}>
-        <img src={foto.previewUrl} alt={foto.file.name} loading="lazy" className="reorder-thumb" />
+      <button
+        type="button"
+        className="reorder-preview-btn"
+        onClick={() => onAbrirPreview(foto.id)}
+      >
+        <img src={foto.previewUrl} alt={foto.file.name} className="reorder-thumb" loading="lazy" />
       </button>
-      <div className="reorder-footer">
-        <span className="reorder-index">#{indice + 1}</span>
-        <button type="button" className="btn danger small" onClick={() => onRemover(foto.id)}>
+      <div className="tile-footer">
+        <span className="tile-index">#{indice + 1}</span>
+        <button type="button" className="secondary small-button danger-button" onClick={() => onRemover(foto.id)}>
           Remover
         </button>
       </div>
@@ -121,28 +140,31 @@ function SortableReorderTile({ foto, indice, onRemover, onAbrirPreview }) {
   );
 }
 
-function DescriptionPhotoCard({ foto, indice, onRemover, onAtualizarDescricao, onAbrirPreview }) {
+function DescriptionPhotoCard({ foto, indice, onAbrirPreview, onAtualizarDescricao, onRemover }) {
   return (
-    <article className="description-photo-card">
-      <button type="button" className="description-preview-btn" onClick={() => onAbrirPreview(foto.id)}>
+    <article className="photo-card">
+      <button type="button" className="photo-preview-button" onClick={() => onAbrirPreview(foto.id)}>
         <img src={foto.previewUrl} alt={foto.file.name} loading="lazy" />
       </button>
-      <div className="description-meta">
-        <div className="description-meta-header">
-          <h3>
-            Foto {indice + 1}
-          </h3>
-          <button type="button" className="btn danger small" onClick={() => onRemover(foto.id)}>
-            Remover
-          </button>
+      <div className="photo-card-body">
+        <div className="photo-card-head">
+          <div>
+            <p className="eyebrow small">Foto {indice + 1}</p>
+            <h3>{foto.file.name}</h3>
+          </div>
         </div>
-        <p>{foto.file.name}</p>
-        <textarea
-          value={foto.description}
-          onChange={(e) => onAtualizarDescricao(foto.id, e.target.value)}
-          rows={4}
-          placeholder="Descreva a foto..."
-        />
+        <label>
+          <span>Descrição</span>
+          <textarea
+            rows={4}
+            value={foto.description}
+            onChange={(event) => onAtualizarDescricao(foto.id, event.target.value)}
+            placeholder={`Ex.: ${criarDescricaoFallback(indice)}`}
+          />
+        </label>
+        <button type="button" className="secondary small-button danger-button" onClick={() => onRemover(foto.id)}>
+          Remover
+        </button>
       </div>
     </article>
   );
@@ -150,17 +172,17 @@ function DescriptionPhotoCard({ foto, indice, onRemover, onAtualizarDescricao, o
 
 export default function App() {
   const [step, setStep] = useState(1);
-  const [isReorderMode, setIsReorderMode] = useState(false);
-  const [previewIndex, setPreviewIndex] = useState(null);
-  const [photoToRemoveId, setPhotoToRemoveId] = useState(null);
-  const [isRestartConfirmOpen, setIsRestartConfirmOpen] = useState(false);
   const [defaults, setDefaults] = useState({
     title: TITULO_PADRAO,
-    source: criarOrigemPadrao()
+    source: criarOrigemPadrao(),
   });
   const [title, setTitle] = useState(TITULO_PADRAO);
   const [source, setSource] = useState(criarOrigemPadrao());
   const [photos, setPhotos] = useState([]);
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState(null);
+  const [photoToRemoveId, setPhotoToRemoveId] = useState(null);
+  const [isRestartConfirmOpen, setIsRestartConfirmOpen] = useState(false);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -174,33 +196,38 @@ export default function App() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   useEffect(() => {
-    let ativo = true;
+    let active = true;
+
     async function carregarDefaults() {
       try {
-        const resposta = await fetch(`${API_BASE_URL}/api/defaults`);
-        if (!resposta.ok) {
-          return;
-        }
-        const data = await resposta.json();
-        if (!ativo) {
-          return;
-        }
-        const novoTitulo = typeof data?.title === "string" && data.title.trim() ? data.title : TITULO_PADRAO;
-        const novaOrigem = typeof data?.source === "string" && data.source.trim() ? data.source : criarOrigemPadrao();
-        setDefaults({ title: novoTitulo, source: novaOrigem });
-        setTitle(novoTitulo);
-        setSource(novaOrigem);
+        const response = await fetch(`${API_BASE_URL}/api/defaults`);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (!active) return;
+
+        const nextTitle =
+          typeof data?.title === "string" && data.title.trim() ? data.title : TITULO_PADRAO;
+        const nextSource =
+          typeof data?.source === "string" && data.source.trim()
+            ? data.source
+            : criarOrigemPadrao();
+
+        setDefaults({ title: nextTitle, source: nextSource });
+        setTitle(nextTitle);
+        setSource(nextSource);
       } catch {
-        // Sem fallback remoto: manter valores locais.
+        // Mantém fallback local.
       }
     }
+
     carregarDefaults();
     return () => {
-      ativo = false;
+      active = false;
     };
   }, []);
 
@@ -230,9 +257,7 @@ export default function App() {
   }, [isReorderMode, photos.length]);
 
   useEffect(() => {
-    if (previewIndex === null) {
-      return;
-    }
+    if (previewIndex === null) return;
     if (!photos.length) {
       setPreviewIndex(null);
       return;
@@ -260,49 +285,48 @@ export default function App() {
     }
 
     const intervalId = window.setInterval(() => {
-      const inicio = generationStartedAtRef.current || Date.now();
-      const decorrido = Math.max(0, Math.floor((Date.now() - inicio) / 1000));
-      setGenerationElapsedSeconds(decorrido);
+      const startedAt = generationStartedAtRef.current || Date.now();
+      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+      setGenerationElapsedSeconds(elapsedSeconds);
     }, 250);
 
     return () => window.clearInterval(intervalId);
   }, [isGenerating]);
 
+  const resumoUpload = useMemo(() => {
+    if (!photos.length) return "Nenhuma foto adicionada.";
+    return `${photos.length} foto(s) pronta(s) para o documento.`;
+  }, [photos]);
+
   const previewPhoto = useMemo(
     () => (previewIndex === null ? null : photos[previewIndex] || null),
-    [photos, previewIndex]
+    [photos, previewIndex],
   );
 
   const photoToRemove = useMemo(
     () => photos.find((foto) => foto.id === photoToRemoveId) || null,
-    [photos, photoToRemoveId]
+    [photos, photoToRemoveId],
   );
 
   function abrirPreviewPorId(photoId) {
-    const idx = photos.findIndex((foto) => foto.id === photoId);
-    if (idx >= 0) {
-      setPreviewIndex(idx);
+    const index = photos.findIndex((foto) => foto.id === photoId);
+    if (index >= 0) {
+      setPreviewIndex(index);
     }
   }
 
   function abrirFotoAnterior() {
-    if (!photos.length || previewIndex === null) {
-      return;
-    }
+    if (!photos.length || previewIndex === null) return;
     setPreviewIndex((previewIndex - 1 + photos.length) % photos.length);
   }
 
   function abrirProximaFoto() {
-    if (!photos.length || previewIndex === null) {
-      return;
-    }
+    if (!photos.length || previewIndex === null) return;
     setPreviewIndex((previewIndex + 1) % photos.length);
   }
 
   useEffect(() => {
-    if (!previewPhoto && !photoToRemove && !isRestartConfirmOpen) {
-      return;
-    }
+    if (!previewPhoto && !photoToRemove && !isRestartConfirmOpen) return;
 
     function onKeyDown(event) {
       if (event.key === "Escape") {
@@ -320,14 +344,13 @@ export default function App() {
         return;
       }
 
-      if (!previewPhoto || photoToRemove || isRestartConfirmOpen) {
-        return;
-      }
+      if (!previewPhoto || photoToRemove || isRestartConfirmOpen) return;
 
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         abrirFotoAnterior();
-      } else if (event.key === "ArrowRight") {
+      }
+      if (event.key === "ArrowRight") {
         event.preventDefault();
         abrirProximaFoto();
       }
@@ -335,109 +358,101 @@ export default function App() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isRestartConfirmOpen, photoToRemove, previewPhoto]);
+  }, [isRestartConfirmOpen, photoToRemove, previewPhoto, photos.length, previewIndex]);
 
-  const resumoUpload = useMemo(() => {
-    if (!photos.length) {
-      return "Nenhuma foto adicionada.";
+  function irParaEtapa(nextStep) {
+    if (nextStep === 2) {
+      setError("");
     }
-    return `${photos.length} foto(s) pronta(s).`;
-  }, [photos]);
+    setStep(nextStep);
+  }
 
   function limparDownload() {
-    setDownloadInfo((prev) => {
-      if (prev?.url) {
-        URL.revokeObjectURL(prev.url);
+    setDownloadInfo((current) => {
+      if (current?.url) {
+        URL.revokeObjectURL(current.url);
       }
       return null;
     });
   }
 
   function adicionarArquivos(fileList) {
-    const arquivos = Array.from(fileList || []);
-    if (!arquivos.length) {
-      return;
-    }
+    const incomingFiles = Array.from(fileList || []);
+    if (!incomingFiles.length) return;
 
-    let houveArquivoInvalido = false;
+    let hasInvalidFile = false;
 
-    setPhotos((prev) => {
-      const existentes = new Set(prev.map((foto) => foto.fileKey));
-      const proximas = [...prev];
+    setPhotos((current) => {
+      const existingKeys = new Set(current.map((foto) => foto.fileKey));
+      const next = [...current];
 
-      for (const file of arquivos) {
+      for (const file of incomingFiles) {
         if (!file.type.startsWith("image/")) {
-          houveArquivoInvalido = true;
+          hasInvalidFile = true;
           continue;
         }
 
         const fileKey = assinaturaArquivo(file);
-        if (existentes.has(fileKey)) {
+        if (existingKeys.has(fileKey)) {
           continue;
         }
 
-        proximas.push({
+        next.push({
           id: gerarId(),
           fileKey,
           file,
           previewUrl: URL.createObjectURL(file),
-          description: ""
+          description: "",
         });
-        existentes.add(fileKey);
+        existingKeys.add(fileKey);
       }
-      return proximas;
+
+      return next;
     });
 
-    if (houveArquivoInvalido) {
-      setError("Alguns arquivos foram ignorados porque nao sao imagens.");
-    } else {
-      setError("");
-    }
     setStatus("");
     limparDownload();
+    setError(hasInvalidFile ? "Alguns arquivos foram ignorados porque não eram imagens." : "");
   }
 
   function removerFoto(id) {
-    if (!photos.some((foto) => foto.id === id)) {
-      return;
-    }
+    if (!photos.some((foto) => foto.id === id)) return;
     setPhotoToRemoveId(id);
   }
 
   function confirmarRemocaoFoto() {
-    if (!photoToRemoveId) {
-      return;
-    }
-    const alvoId = photoToRemoveId;
-    const indiceRemovido = photos.findIndex((foto) => foto.id === alvoId);
-    const totalAntes = photos.length;
-    setPhotoToRemoveId(null);
+    if (!photoToRemoveId) return;
 
-    setPhotos((prev) => {
-      const alvo = prev.find((foto) => foto.id === alvoId);
-      if (alvo) {
-        URL.revokeObjectURL(alvo.previewUrl);
+    const removedIndex = photos.findIndex((foto) => foto.id === photoToRemoveId);
+    const totalBefore = photos.length;
+    const targetId = photoToRemoveId;
+
+    setPhotoToRemoveId(null);
+    setPhotos((current) => {
+      const target = current.find((foto) => foto.id === targetId);
+      if (target) {
+        URL.revokeObjectURL(target.previewUrl);
       }
-      return prev.filter((foto) => foto.id !== alvoId);
+      return current.filter((foto) => foto.id !== targetId);
     });
 
-    if (previewIndex !== null && indiceRemovido >= 0) {
-      if (totalAntes <= 1) {
+    if (previewIndex !== null && removedIndex >= 0) {
+      if (totalBefore <= 1) {
         setPreviewIndex(null);
-      } else if (indiceRemovido < previewIndex) {
+      } else if (removedIndex < previewIndex) {
         setPreviewIndex(previewIndex - 1);
-      } else if (indiceRemovido === previewIndex) {
-        const proximoIndice = previewIndex >= totalAntes - 1 ? totalAntes - 2 : previewIndex;
-        setPreviewIndex(proximoIndice);
+      } else if (removedIndex === previewIndex) {
+        setPreviewIndex(previewIndex >= totalBefore - 1 ? totalBefore - 2 : previewIndex);
       }
     }
+
     setStatus("");
     limparDownload();
   }
 
   function limparFotos() {
-    setPhotos((prev) => {
-      for (const foto of prev) {
+    setPhotos((current) => {
+      for (const foto of current) {
         URL.revokeObjectURL(foto.previewUrl);
       }
       return [];
@@ -449,6 +464,13 @@ export default function App() {
     setPhotoToRemoveId(null);
     setIsRestartConfirmOpen(false);
     limparDownload();
+  }
+
+  function recomecarFluxo() {
+    limparFotos();
+    setTitle(defaults.title);
+    setSource(defaults.source);
+    setStep(1);
   }
 
   function handleFileInput(event) {
@@ -464,51 +486,20 @@ export default function App() {
 
   function handleDragEnd(event) {
     const { active, over } = event;
-    if (!over || active.id === over.id) {
-      return;
-    }
+    if (!over || active.id === over.id) return;
 
-    setPhotos((prev) => {
-      const oldIndex = prev.findIndex((item) => item.id === active.id);
-      const newIndex = prev.findIndex((item) => item.id === over.id);
-      if (oldIndex < 0 || newIndex < 0) {
-        return prev;
-      }
-      return arrayMove(prev, oldIndex, newIndex);
+    setPhotos((current) => {
+      const oldIndex = current.findIndex((item) => item.id === active.id);
+      const newIndex = current.findIndex((item) => item.id === over.id);
+      if (oldIndex < 0 || newIndex < 0) return current;
+      return arrayMove(current, oldIndex, newIndex);
     });
   }
 
-  function atualizarDescricao(id, valor) {
-    setPhotos((prev) => prev.map((foto) => (foto.id === id ? { ...foto, description: valor } : foto)));
-  }
-
-  function irParaUpload() {
-    setError("");
-    setIsReorderMode(false);
-    setStep(2);
-  }
-
-  function recomecarFluxo() {
-    limparFotos();
-    setTitle(defaults.title);
-    setSource(defaults.source);
-    setStatus("");
-    setError("");
-    setIsReorderMode(false);
-    setPreviewIndex(null);
-    setPhotoToRemoveId(null);
-    setIsRestartConfirmOpen(false);
-    setStep(1);
-  }
-
-  function abrirConfirmacaoRecomeco() {
-    setPreviewIndex(null);
-    setPhotoToRemoveId(null);
-    setIsRestartConfirmOpen(true);
-  }
-
-  function confirmarRecomeco() {
-    recomecarFluxo();
+  function atualizarDescricao(id, value) {
+    setPhotos((current) =>
+      current.map((foto) => (foto.id === id ? { ...foto, description: value } : foto)),
+    );
   }
 
   async function gerarDocumento() {
@@ -524,7 +515,6 @@ export default function App() {
     setError("");
     limparDownload();
 
-    // Garante que o modal de loading seja renderizado antes de iniciar o envio.
     await aguardarProximoFrame();
 
     const formData = new FormData();
@@ -533,51 +523,51 @@ export default function App() {
     formData.append(
       "descriptions",
       JSON.stringify(
-        photos.map((foto, idx) => {
-          const texto = foto.description.trim();
-          return texto || `Foto ${idx + 1}`;
-        })
-      )
+        photos.map((foto, indice) => foto.description.trim() || criarDescricaoFallback(indice)),
+      ),
     );
+
     for (const foto of photos) {
       formData.append("files", foto.file, foto.file.name);
     }
 
     try {
-      const resposta = await fetch(`${API_BASE_URL}/api/generate`, {
+      const response = await fetch(`${API_BASE_URL}/api/generate`, {
         method: "POST",
-        body: formData
+        body: formData,
       });
 
-      if (!resposta.ok) {
-        let erroApi = "Erro ao gerar documento.";
+      if (!response.ok) {
+        let apiError = "Erro ao gerar documento.";
         try {
-          const body = await resposta.json();
+          const body = await response.json();
           if (body?.detail) {
-            erroApi = body.detail;
+            apiError = body.detail;
           }
         } catch {
-          // resposta sem corpo JSON
+          // resposta sem JSON
         }
-        throw new Error(erroApi);
+        throw new Error(apiError);
       }
 
-      const nomeArquivo =
-        extrairNomeArquivo(resposta.headers.get("content-disposition")) ||
+      const fileName =
+        extrairNomeArquivo(response.headers.get("content-disposition")) ||
         `registro_fotografico_${Date.now()}.docx`;
-      const blob = await resposta.blob();
+      const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      setDownloadInfo({ url, name: nomeArquivo });
+
+      setDownloadInfo({ url, name: fileName });
       setStatus(`Documento criado com ${photos.length} foto(s).`);
-      baixarArquivo(url, nomeArquivo);
+      baixarArquivo(url, fileName);
     } catch (err) {
-      const mensagem = err instanceof Error ? err.message : "Falha inesperada ao gerar documento.";
-      setError(mensagem);
+      setError(err instanceof Error ? err.message : "Falha inesperada ao gerar documento.");
     } finally {
-      const inicio = generationStartedAtRef.current ?? Date.now();
-      const decorridoMs = Date.now() - inicio;
-      if (decorridoMs < TEMPO_MINIMO_LOADER_MS) {
-        await new Promise((resolve) => window.setTimeout(resolve, TEMPO_MINIMO_LOADER_MS - decorridoMs));
+      const startedAt = generationStartedAtRef.current ?? Date.now();
+      const elapsedMs = Date.now() - startedAt;
+      if (elapsedMs < TEMPO_MINIMO_LOADER_MS) {
+        await new Promise((resolve) =>
+          window.setTimeout(resolve, TEMPO_MINIMO_LOADER_MS - elapsedMs),
+        );
       }
       setIsGenerating(false);
     }
@@ -585,257 +575,311 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <div className="bg-shape bg-shape-top" />
-      <div className="bg-shape bg-shape-bottom" />
-      <main className="container">
-        <header className="hero">
-          <h1>Gerador de Registro Fotográfico</h1>
-        </header>
+      <aside className="side-dots" aria-label="Etapas">
+        {ETAPAS.map((etapa) => (
+          <button
+            key={etapa.id}
+            type="button"
+            className={`side-dot ${step === etapa.id ? "active" : ""}`}
+            data-step-label={etapa.short}
+            aria-label={`Etapa ${etapa.id} - ${etapa.title}`}
+            onClick={() => irParaEtapa(etapa.id)}
+          >
+            {etapa.id}
+          </button>
+        ))}
+      </aside>
 
-        <ol className="stepper" aria-label="Etapas do processo">
-          {ETAPAS.map((label, idx) => {
-            const numero = idx + 1;
-            const statusClasse = step === numero ? "active" : step > numero ? "done" : "";
-            return (
-              <li key={label} className={statusClasse}>
-                <span>{numero}</span>
-                <strong>{label}</strong>
-              </li>
-            );
-          })}
-        </ol>
+      <main className="page">
+        <section className="hero">
+          <div className="hero-brand">
+            <img className="hero-logo" src="/assets/RodaModelo-cortado.png" alt="RodaModelo" />
+          </div>
+          <div className="hero-copy">
+            <h1 className="hero-title">Gerador de Relatório Fotográfico</h1>
+            <p className="hero-subtitle hero-subtitle-current">
+              Anexo fotográfico com fotos, ordem final e descrições
+            </p>
+            <p className="eyebrow">Registro Fotográfico</p>
+            <h1>Gerador de Documento Fotográfico</h1>
+            <p className="hero-subtitle">
+              Extraído do Space original e reorganizado em um fluxo com etapas, cards e ações no
+              padrão visual dos seus apps.
+            </p>
+          </div>
+          <div className="hero-badge">
+            <strong>Saída</strong>
+            <span>.docx com fotos, ordem final e descrições</span>
+          </div>
+        </section>
 
-        <section className="card">
-          {step === 1 && (
-            <div className="stage">
-              <h2>Etapa 1: Informacoes do Documento</h2>
-              <label>
-                Titulo do documento
-                <input value={title} onChange={(e) => setTitle(e.target.value)} />
-              </label>
-              <label>
-                Origem das fotos
-                <input value={source} onChange={(e) => setSource(e.target.value)} />
-              </label>
-              <div className="actions">
-                <button type="button" className="btn primary" onClick={irParaUpload}>
-                  Proximo: Fotos, ordem e descricoes
-                </button>
-              </div>
+        <section className="status-strip" aria-label="Resumo do processo">
+          <div className="status-item">
+            <span>Etapa atual</span>
+            <strong>{step === 1 ? "Dados" : isReorderMode ? "Reordenar" : "Descrições"}</strong>
+          </div>
+          <div className="status-item">
+            <span>Fotos</span>
+            <strong>{photos.length}</strong>
+          </div>
+          <div className="status-item">
+            <span>Documento</span>
+            <strong>{downloadInfo ? "Pronto" : isGenerating ? "Gerando" : "Pendente"}</strong>
+          </div>
+        </section>
+
+        <section className={`panel ${step === 1 ? "is-active-step" : ""}`}>
+          <div className="section-head">
+            <div>
+              <p className="eyebrow small">Etapa 1</p>
+              <h2>Informações do documento</h2>
             </div>
-          )}
+          </div>
 
-          {step === 2 && (
-            <div className="stage">
-              <h2>Etapa 2: Fotos, Ordem e Descricoes</h2>
-              {photos.length > 0 && (
-                <p className="muted">
-                  Adicione fotos, arraste para definir a ordem final e escreva as descricoes no mesmo fluxo.
-                </p>
-              )}
-              <label
-                className={`dropzone ${isDropzoneActive ? "dropzone-active" : ""}`}
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setIsDropzoneActive(true);
-                }}
-                onDragLeave={() => setIsDropzoneActive(false)}
-                onDrop={handleDrop}
+          <div className="panel-body stage-grid">
+            <label className="field-card">
+              <span>Título do documento</span>
+              <input value={title} onChange={(event) => setTitle(event.target.value)} />
+            </label>
+            <label className="field-card field-card-wide">
+              <span>Origem das fotos</span>
+              <input value={source} onChange={(event) => setSource(event.target.value)} />
+            </label>
+          </div>
+        </section>
+
+        <section className={`panel ${step === 2 ? "is-active-step" : ""}`}>
+          <div className="section-head">
+            <div>
+              <p className="eyebrow small">Etapa 2</p>
+              <h2>Fotos, ordem e descrições</h2>
+            </div>
+            <div className="actions">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setIsReorderMode((current) => !current)}
+                disabled={photos.length < 2}
               >
-                <input type="file" accept="image/*" multiple onChange={handleFileInput} />
-                <strong>Arraste fotos para ca ou clique para selecionar</strong>
-                <span>Imagens serao adicionadas sem duplicar arquivos iguais.</span>
-              </label>
+                {isReorderMode ? "Concluir reordenação" : "Reordenar fotos"}
+              </button>
+              <button type="button" className="secondary" onClick={() => irParaEtapa(1)}>
+                Voltar aos dados
+              </button>
+            </div>
+          </div>
 
-              {photos.length > 0 ? (
-                <>
-                  <p className="muted">{resumoUpload}</p>
+          <div className="panel-body">
+            <label
+              className={`dropzone ${isDropzoneActive ? "dropzone-active" : ""}`}
+              onDragOver={(event) => {
+                event.preventDefault();
+                setIsDropzoneActive(true);
+              }}
+              onDragLeave={() => setIsDropzoneActive(false)}
+              onDrop={handleDrop}
+            >
+              <input type="file" accept="image/*" multiple onChange={handleFileInput} />
+              <strong>Arraste fotos para cá ou clique para selecionar</strong>
+              <span>O app evita duplicações básicas e mantém a ordem final definida por você.</span>
+            </label>
 
-                  <div className="panel-top-actions">
-                    <button
-                      type="button"
-                      className={`btn ${isReorderMode ? "primary" : "ghost"}`}
-                      onClick={() => setIsReorderMode((prev) => !prev)}
-                      disabled={photos.length < 2}
-                    >
-                      {isReorderMode ? "Concluir reordenacao" : "Reordenar fotos"}
-                    </button>
-                    <p className="muted panel-hint">
-                      {isReorderMode
-                        ? "Modo reordenar ativo: miniaturas menores em grade arrastavel."
-                        : "Modo descricao: fotos em pares com campo de descricao sempre visivel."}
-                    </p>
-                  </div>
+            {photos.length > 0 && (
+            <div className="toolbar-card">
+              <div>
+              <p className="muted">{resumoUpload}</p>
+              <p className="muted">
+                {isReorderMode
+                  ? "Modo reordenação ativo: arraste os cards e clique na miniatura para ampliar."
+                  : "Modo descrição ativo: preencha a legenda de cada foto no próprio card."}
+              </p>
+              </div>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setIsReorderMode((current) => !current)}
+                disabled={photos.length < 2}
+              >
+                {isReorderMode ? "Concluir reordenação" : "Reordenar fotos"}
+              </button>
+            </div>
+            )}
 
-                  {isReorderMode ? (
-                    <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                      <SortableContext items={photos.map((foto) => foto.id)} strategy={rectSortingStrategy}>
-                        <div className="reorder-grid">
-                          {photos.map((foto, idx) => (
-                            <SortableReorderTile
-                              key={foto.id}
-                              foto={foto}
-                              indice={idx}
-                              onRemover={removerFoto}
-                              onAbrirPreview={abrirPreviewPorId}
-                            />
-                          ))}
-                        </div>
-                      </SortableContext>
-                    </DndContext>
-                  ) : (
-                    <div className="description-grid">
-                      {photos.map((foto, idx) => (
-                      <DescriptionPhotoCard
+            {!photos.length && (
+              <div className="empty-block">Envie imagens para começar a montar o documento.</div>
+            )}
+
+            {photos.length > 0 && isReorderMode && (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={photos.map((foto) => foto.id)} strategy={rectSortingStrategy}>
+                  <div className="reorder-grid">
+                    {photos.map((foto, indice) => (
+                      <SortablePhotoTile
                         key={foto.id}
                         foto={foto}
-                        indice={idx}
-                        onRemover={removerFoto}
-                        onAtualizarDescricao={atualizarDescricao}
+                        indice={indice}
                         onAbrirPreview={abrirPreviewPorId}
+                        onRemover={removerFoto}
                       />
                     ))}
                   </div>
-                  )}
+                </SortableContext>
+              </DndContext>
+            )}
 
-                  <p className="muted">Se uma descricao ficar vazia, o sistema usa automaticamente Foto N.</p>
-
-                  {status && <p className="status-ok">{status}</p>}
-                  {downloadInfo && (
-                    <div className="download-box">
-                      <p>Documento pronto: {downloadInfo.name}</p>
-                      <button type="button" className="btn primary" onClick={() => baixarArquivo(downloadInfo.url, downloadInfo.name)}>
-                        Baixar novamente
-                      </button>
-                    </div>
-                  )}
-
-                  <div className="final-actions-grid">
-                    <button type="button" className="btn back" onClick={() => setStep(1)}>
-                      Voltar
-                    </button>
-                    <button type="button" className="btn warning" onClick={limparFotos} disabled={!photos.length}>
-                      Limpar fotos
-                    </button>
-                    <button
-                      type="button"
-                      className="btn primary"
-                      onClick={gerarDocumento}
-                      disabled={isGenerating || !photos.length}
-                    >
-                      {isGenerating ? "Gerando..." : "Gerar documento Word"}
-                    </button>
-                    <button type="button" className="btn danger" onClick={abrirConfirmacaoRecomeco}>
-                      Recomecar
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="actions">
-                    <button type="button" className="btn back" onClick={() => setStep(1)}>
-                      Voltar
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {error && <p className="status-error">{error}</p>}
-        </section>
-
-        {previewPhoto && (
-          <div className="photo-modal-backdrop" role="dialog" aria-modal="true" onClick={() => setPreviewIndex(null)}>
-            <div className="photo-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="photo-modal-top">
-                <div className="photo-modal-nav">
-                  <button
-                    type="button"
-                    className="btn ghost small"
-                    onClick={abrirFotoAnterior}
-                    disabled={photos.length < 2}
-                    aria-label="Foto anterior"
-                  >
-                    Anterior
-                  </button>
-                  <p>{`Foto ${(previewIndex ?? 0) + 1} de ${photos.length}`}</p>
-                  <button
-                    type="button"
-                    className="btn ghost small"
-                    onClick={abrirProximaFoto}
-                    disabled={photos.length < 2}
-                    aria-label="Proxima foto"
-                  >
-                    Proxima
-                  </button>
-                </div>
-                <div className="photo-modal-actions">
-                  <button type="button" className="btn danger small" onClick={() => removerFoto(previewPhoto.id)}>
-                    Remover
-                  </button>
-                  <button type="button" className="btn ghost small" onClick={() => setPreviewIndex(null)}>
-                    Fechar
-                  </button>
-                </div>
+            {photos.length > 0 && !isReorderMode && (
+              <div className="photo-grid">
+                {photos.map((foto, indice) => (
+                  <DescriptionPhotoCard
+                    key={foto.id}
+                    foto={foto}
+                    indice={indice}
+                    onAbrirPreview={abrirPreviewPorId}
+                    onAtualizarDescricao={atualizarDescricao}
+                    onRemover={removerFoto}
+                  />
+                ))}
               </div>
-              <div className="photo-modal-image-wrap">
-                <img src={previewPhoto.previewUrl} alt={previewPhoto.file.name} />
-              </div>
-              <p className="photo-modal-caption">{previewPhoto.file.name}</p>
-            </div>
-          </div>
-        )}
+            )}
 
-        {photoToRemove && (
-          <div className="confirm-modal-backdrop" role="dialog" aria-modal="true" onClick={() => setPhotoToRemoveId(null)}>
-            <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
-              <div className="confirm-modal-preview-wrap">
-                <img className="confirm-modal-preview" src={photoToRemove.previewUrl} alt={photoToRemove.file.name} />
-              </div>
-              <h3>Remover foto?</h3>
-              <p>
-                A foto <strong>{photoToRemove.file.name}</strong> sera removida da lista e nao ira para o documento.
+            {photos.length > 0 && (
+              <p className="muted helper-line">
+                Se uma descrição ficar vazia, o sistema usa automaticamente{" "}
+                <code>Foto N</code>.
               </p>
-              <div className="confirm-modal-actions">
-                <button type="button" className="btn ghost" onClick={() => setPhotoToRemoveId(null)}>
-                  Cancelar
+            )}
+
+            {status && <p className="app-notice success">{status}</p>}
+            {error && <p className="app-notice error">{error}</p>}
+
+            {downloadInfo && (
+              <div className="download-card">
+                <div>
+                  <p className="eyebrow small">Arquivo pronto</p>
+                  <strong>{downloadInfo.name}</strong>
+                </div>
+                <button
+                  type="button"
+                  className="secondary"
+                  onClick={() => baixarArquivo(downloadInfo.url, downloadInfo.name)}
+                >
+                  Baixar novamente
                 </button>
-                <button type="button" className="btn danger" onClick={confirmarRemocaoFoto}>
+              </div>
+            )}
+
+            {photos.length > 0 && (
+            <div className="table-actions split-actions">
+              <button type="button" className="secondary" onClick={limparFotos} disabled={!photos.length}>
+                Limpar fotos
+              </button>
+              <div className="actions">
+                <button type="button" className="secondary danger-button" onClick={() => setIsRestartConfirmOpen(true)}>
+                  Recomeçar
+                </button>
+                <button type="button" onClick={gerarDocumento} disabled={isGenerating || !photos.length}>
+                  {isGenerating ? "Gerando..." : "Gerar documento Word"}
+                </button>
+              </div>
+            </div>
+            )}
+          </div>
+        </section>
+      </main>
+
+      {previewPhoto && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setPreviewIndex(null)}>
+          <div className="modal-card modal-photo" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow small">Prévia</p>
+                <h3>{previewPhoto.file.name}</h3>
+              </div>
+              <div className="actions">
+                <button type="button" className="secondary" onClick={abrirFotoAnterior} disabled={photos.length < 2}>
+                  Anterior
+                </button>
+                <button type="button" className="secondary" onClick={abrirProximaFoto} disabled={photos.length < 2}>
+                  Próxima
+                </button>
+                <button type="button" className="secondary danger-button" onClick={() => removerFoto(previewPhoto.id)}>
                   Remover
                 </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {isRestartConfirmOpen && (
-          <div className="confirm-modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsRestartConfirmOpen(false)}>
-            <div className="confirm-modal warning" onClick={(e) => e.stopPropagation()}>
-              <h3>Recomecar processo?</h3>
-              <p>Todo o progresso atual sera perdido: fotos, ordem e descricoes.</p>
-              <div className="confirm-modal-actions">
-                <button type="button" className="btn ghost" onClick={() => setIsRestartConfirmOpen(false)}>
-                  Cancelar
-                </button>
-                <button type="button" className="btn danger" onClick={confirmarRecomeco}>
-                  Recomecar
+                <button type="button" className="secondary" onClick={() => setPreviewIndex(null)}>
+                  Fechar
                 </button>
               </div>
             </div>
+            <div className="modal-photo-frame">
+              <img src={previewPhoto.previewUrl} alt={previewPhoto.file.name} />
+            </div>
+            <p className="muted">{`Foto ${(previewIndex ?? 0) + 1} de ${photos.length}`}</p>
           </div>
-        )}
+        </div>
+      )}
 
-        {isGenerating && (
-          <div className="loading-modal-backdrop" role="status" aria-live="polite" aria-modal="true">
-            <div className="loading-modal">
-              <div className="loading-spinner" aria-hidden="true" />
-              <h3>Gerando documento Word...</h3>
-              <p>Tempo decorrido: {formatarTempoGeracao(generationElapsedSeconds)}</p>
+      {photoToRemove && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setPhotoToRemoveId(null)}>
+          <div className="modal-card confirm-card" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow small">Confirmação</p>
+                <h3>Remover foto?</h3>
+              </div>
+            </div>
+            <img className="confirm-thumb" src={photoToRemove.previewUrl} alt={photoToRemove.file.name} />
+            <p className="muted">
+              A foto <strong>{photoToRemove.file.name}</strong> será removida da lista e não irá para o documento.
+            </p>
+            <div className="table-actions split-actions">
+              <button type="button" className="secondary" onClick={() => setPhotoToRemoveId(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="danger-button" onClick={confirmarRemocaoFoto}>
+                Remover
+              </button>
             </div>
           </div>
-        )}
-      </main>
+        </div>
+      )}
+
+      {isRestartConfirmOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setIsRestartConfirmOpen(false)}>
+          <div className="modal-card confirm-card" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <p className="eyebrow small">Confirmação</p>
+                <h3>Recomeçar processo?</h3>
+              </div>
+            </div>
+            <p className="muted">
+              Todo o progresso atual será perdido: fotos, ordem, descrições e arquivo gerado.
+            </p>
+            <div className="table-actions split-actions">
+              <button type="button" className="secondary" onClick={() => setIsRestartConfirmOpen(false)}>
+                Cancelar
+              </button>
+              <button type="button" className="danger-button" onClick={recomecarFluxo}>
+                Recomeçar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isGenerating && (
+        <div className="processing-overlay" role="status" aria-live="polite" aria-modal="true">
+          <div className="processing-card">
+            <div className="processing-spinner" aria-hidden="true" />
+            <strong>Gerando documento Word...</strong>
+            <span>Tempo decorrido: {formatarTempoGeracao(generationElapsedSeconds)}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
