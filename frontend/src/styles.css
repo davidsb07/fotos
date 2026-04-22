@@ -135,9 +135,9 @@ code {
 
 .page {
   width: min(1680px, calc(100vw - 96px));
-  margin: 14px auto 32px;
+  margin: 10px auto 24px;
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .side-dots {
@@ -210,11 +210,11 @@ code {
 .hero {
   display: grid;
   grid-template-columns: auto 1fr;
-  gap: 24px;
+  gap: 18px;
   align-items: center;
   background: linear-gradient(130deg, #fbfcfd, #fff 55%, #f4f8fa);
   box-shadow: var(--shadow-md);
-  padding: 16px 18px;
+  padding: 12px 16px;
 }
 
 .hero-brand {
@@ -316,10 +316,14 @@ code {
 }
 
 .hero h1 {
-  margin: 0 0 8px;
-  font-size: clamp(1rem, 1.5vw, 1.625rem);
+  margin: 0 0 6px;
+  font-size: clamp(0.95rem, 1.25vw, 1.38rem);
   line-height: 1.04;
   text-align: center;
+}
+
+.panel h2 {
+  font-size: 0.95rem;
 }
 
 .hero-subtitle,
@@ -406,7 +410,7 @@ code {
 
 .panel {
   position: relative;
-  padding: 18px 20px;
+  padding: 14px 16px;
   overflow: hidden;
   transition:
     border-color 0.18s ease,
@@ -435,7 +439,7 @@ code {
 
 .panel-body {
   display: grid;
-  gap: 14px;
+  gap: 10px;
 }
 
 .section-head {
@@ -443,9 +447,9 @@ code {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px 20px;
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  gap: 10px 16px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
 }
 
 .section-head::after {
@@ -490,7 +494,7 @@ code {
 .field-card {
   display: grid;
   gap: 6px;
-  padding: 12px 14px;
+  padding: 10px 12px;
   border-top: 3px solid rgba(179, 138, 61, 0.26);
 }
 
@@ -501,7 +505,7 @@ code {
 }
 
 .field-card-wide {
-  grid-column: 1 / -1;
+  grid-column: auto;
 }
 
 .dropzone {
@@ -581,7 +585,7 @@ code {
 .photo-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 12px;
 }
 
 .photo-card {
@@ -883,6 +887,7 @@ code {
 
   .page {
     width: min(100% - 20px, 980px);
+    margin-top: 10px;
     margin-bottom: 76px;
   }
 
@@ -912,7 +917,7 @@ code {
   .panel,
   .hero,
   .status-strip {
-    padding: 14px;
+    padding: 12px;
   }
 
   .hero-mark {
